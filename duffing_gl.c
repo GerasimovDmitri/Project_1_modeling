@@ -83,7 +83,7 @@ void display(void) {
         glVertex2f(0.0,  phase_scale);
     glEnd();
     
-    // Отрисовка всей траектории (серая, полупрозрачная)
+    // Отрисовка всей траектории
     glColor4f(0.5, 0.5, 0.5, 0.3);
     glBegin(GL_LINE_STRIP);
     for (int i = 0; i < TRAIL_LEN; i++) {
@@ -94,7 +94,7 @@ void display(void) {
     }
     glEnd();
     
-    // Отрисовка следа (хвоста) - красная линия
+    // Отрисовка следа
     glColor3f(0.8, 0.2, 0.2);
     glLineWidth(2.0);
     glBegin(GL_LINE_STRIP);
