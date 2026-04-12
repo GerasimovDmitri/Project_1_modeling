@@ -11,10 +11,9 @@
 double delta = 0.0;          // затухание (0 = консервативный случай)
 double alpha = 1.0;          // линейная жёсткость
 double beta  = 0.5;          // нелинейная жёсткость
-double force_amp = 0.0;      // амплитуда внешней силы (было gamma)
-double force_freq = 1.0;     // частота (было omega)
+double force_amp = 0.0;      // амплитуда внешней силы
+double force_freq = 1.0;     // частота
 
-// Система ОДУ первого порядка:
 // dx/dt = v
 // dv/dt = -delta*v - alpha*x - beta*x^3 + force_amp*cos(force_freq*t)
 
