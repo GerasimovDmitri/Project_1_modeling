@@ -14,6 +14,11 @@ double beta  = 0.5;          // нелинейная жёсткость
 double force_amp = 0.0;      // амплитуда внешней силы
 double force_freq = 1.0;     // частота
 
+//Описывается дифф. уравнением второго порядка:
+//d²x/dt² + δ·dx/dt + α·x + β·x³ = F·cos(ω·t)
+
+//Сводим к двум первого
+
 // dx/dt = v
 // dv/dt = -delta*v - alpha*x - beta*x^3 + force_amp*cos(force_freq*t)
 
@@ -117,7 +122,7 @@ int main() {
         if (E_rel_error > max_error) max_error = E_rel_error;
     }
     printf("\nМаксимальная относительная ошибка энергии: %.2e\n", max_error);
-    printf("(должна быть < 1e-11 для RK4 - это доказывает точность)\n");
+    printf("(должна быть < 1e-11 для RK4)\n");
     
     printf("\nДанные сохранены в 'duffing_data.txt'\n");
     printf("Запустите Gnuplot командой: gnuplot duffing_plot.gp\n");
