@@ -7,7 +7,6 @@
 #include <windows.h>
 #endif
 
-// Параметры системы
 typedef struct {
     double delta, alpha, beta, gamma, omega;
     double t, x, v;
@@ -24,26 +23,22 @@ DuffingSystem sys = {
     .v = 0.0
 };
 
-// Параметры анимации
 double dt = 0.01;
 int running = 1;
 double phase_scale = 2.5;
 double time_scale = 2.5;
 
-// Хранение истории для следа (хвоста)
 #define TRAIL_LEN 200
 double trail_x[TRAIL_LEN];
 double trail_v[TRAIL_LEN];
 int trail_idx = 0;
 
-// Функция правой части ОДУ
 void duffing_rhs(double t, double x, double v, double *dx, double *dv) {
     *dx = v;
     *dv = -sys.delta * v - sys.alpha * x - sys.beta * x*x*x 
           + sys.gamma * cos(sys.omega * t);
 }
 
-// Шаг Рунге-Кутты 4-го порядка
 void rk4_step(void) {
     double k1x, k1v, k2x, k2v, k3x, k3v, k4x, k4v;
     double dx1, dv1, dx2, dv2, dx3, dv3, dx4, dv4;
@@ -69,12 +64,9 @@ void rk4_step(void) {
     sys.t = sys.t + dt;
 }
 
-// Функция отрисовки
 void display(void) {
     glClear(GL_COLOR_BUFFER_BIT);
     glLoadIdentity();
-    
-    // Отрисовка осей
     glColor3f(0.5, 0.5, 0.5);
     glBegin(GL_LINES);
         glVertex2f(-phase_scale, 0.0);
@@ -82,8 +74,6 @@ void display(void) {
         glVertex2f(0.0, -phase_scale);
         glVertex2f(0.0,  phase_scale);
     glEnd();
-    
-    // Отрисовка всей траектории
     glColor4f(0.5, 0.5, 0.5, 0.3);
     glBegin(GL_LINE_STRIP);
     for (int i = 0; i < TRAIL_LEN; i++) {
@@ -94,7 +84,6 @@ void display(void) {
     }
     glEnd();
     
-    // Отрисовка следа
     glColor3f(0.8, 0.2, 0.2);
     glLineWidth(2.0);
     glBegin(GL_LINE_STRIP);
@@ -106,14 +95,11 @@ void display(void) {
     }
     glEnd();
     
-    // Отрисовка текущей точки
     glPointSize(8.0);
     glColor3f(1.0, 0.0, 0.0);
     glBegin(GL_POINTS);
         glVertex2f(sys.x, sys.v);
     glEnd();
-    
-    // Отрисовка текста с параметрами
     glColor3f(1.0, 1.0, 1.0);
     glRasterPos2f(-phase_scale + 0.2, phase_scale - 0.3);
     char info[256];
@@ -128,7 +114,6 @@ void display(void) {
     glutSwapBuffers();
 }
 
-// Обновление состояния
 void update(int value) {
     if (running) {
         trail_x[trail_idx] = sys.x;
@@ -141,10 +126,9 @@ void update(int value) {
     }
     
     glutPostRedisplay();
-    glutTimerFunc(16, update, 0);  // ~60 FPS
+    glutTimerFunc(16, update, 0);
 }
 
-// Обработка клавиш
 void keyboard(unsigned char key, int x, int y) {
     switch(key) {
         case ' ':
@@ -177,7 +161,6 @@ void keyboard(unsigned char key, int x, int y) {
     glutPostRedisplay();
 }
 
-// Инициализация OpenGL
 void init_gl(int argc, char **argv) {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
@@ -199,10 +182,10 @@ int main(int argc, char **argv) {
     printf("Осциллятор Дуффинга - OpenGL анимация\n");
     printf("\n");
     printf("Управление:\n");
-    printf("  Пробел - пауза/запуск\n");
-    printf("  R      - сброс\n");
-    printf("  +/-    - изменение шага dt\n");
-    printf("  Q/ESC  - выход\n");
+    printf("Пробел - пауза/запуск\n");
+    printf("R      - сброс\n");
+    printf("+/-    - изменение шага dt\n");
+    printf("Q/ESC  - выход\n");
     printf("\n");
     
     init_gl(argc, argv);
