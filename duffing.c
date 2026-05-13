@@ -136,14 +136,14 @@ static void print_stats(void) {
 }
 
 static void print_params(void) {
-    printf("  Параметры:\n");
-    printf("    Затухание  %.3f\n", params.delta);
-    printf("    Линейная жсткость   %.3f\n", params.alpha);
-    printf("    Нелинейная жесткость %.3f\n", params.beta);
-    printf("    Амплитуда  %.3f\n", params.F);
-    printf("    Частота   %.3f\n", params.omega);
-    printf("  Численные параметры:\n");
-    printf("    dt = %.4f, шагов = %d\n", DT, N);
+    printf("Параметры:\n");
+    printf("Затухание  %.3f\n", params.delta);
+    printf("Линейная жсткость   %.3f\n", params.alpha);
+    printf("Нелинейная жесткость %.3f\n", params.beta);
+    printf("Аплитуда  %.3f\n", params.F);
+    printf("Частота   %.3f\n", params.omega);
+    printf("Численные параметры:\n");
+    printf("dt = %.4f, шагов = %d\n", DT, N);
 }
 
 int main(void) {
