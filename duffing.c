@@ -2,130 +2,161 @@
 #include <math.h>
 #include <stdlib.h>
 
-#define N 5000          // количество шагов
-#define DT 0.01         // шаг по времени
+#define N 5000
+#define DT 0.01
 
-// Параметры осциллятора Дуффинга
-// Уравнение: d^2x/dt^2 + delta*dx/dt + alpha*x + beta*x^3 = force_amp*cos(force_freq*t)
+static struct {
+    double delta;
+    double alpha;
+    double beta;
+    double F;
+    double omega;
+} params = {0.0, 1.0, 0.5, 0.0, 1.0}; 
 
-double delta = 0.0;          // затухание (0 = консервативный случай)
-double alpha = 1.0;          // линейная жёсткость
-double beta  = 0.5;          // нелинейная жёсткость
-double force_amp = 0.0;      // амплитуда внешней силы
-double force_freq = 1.0;     // частота
+static struct {
+    double *t;
+    double *x;
+    double *v;
+    double *E;
+    int n;
+} trajectory = {NULL, NULL, NULL, NULL, 0};
 
-//Описывается дифф. уравнением второго порядка:
-//d²x/dt² + δ·dx/dt + α·x + β·x³ = F·cos(ω·t)
-
-//Сводим к двум первого
-
-// dx/dt = v
-// dv/dt = -delta*v - alpha*x - beta*x^3 + force_amp*cos(force_freq*t)
-
-void duffing(double t, double x, double v, double *dx, double *dv) {
+static void rhs(double t, double x, double v, double *dx, double *dv) {
+    double force = params.F * cos(params.omega * t);
+    double nonlinear = params.alpha * x + params.beta * x * x * x;
+    
     *dx = v;
-    *dv = -delta * v - alpha * x - beta * x * x * x + force_amp * cos(force_freq * t);
+    *dv = -params.delta * v - nonlinear + force;
 }
 
-// Метод Рунге-Кутты 4-го порядка
-void rk4_step(double *t, double *x, double *v, double dt) {
+static void rk4_step(double *t, double *x, double *v) {
     double k1x, k1v, k2x, k2v, k3x, k3v, k4x, k4v;
-    double dx1, dv1, dx2, dv2, dx3, dv3, dx4, dv4;
-    double t_mid, x_mid, v_mid;
+    double dx, dv, t_half;
     
-    // k1
-    duffing(*t, *x, *v, &dx1, &dv1);
-    k1x = dt * dx1;
-    k1v = dt * dv1;
+    rhs(*t, *x, *v, &dx, &dv);
+    k1x = DT * dx;
+    k1v = DT * dv;
     
-    // k2
-    t_mid = *t + dt/2.0;
-    x_mid = *x + k1x/2.0;
-    v_mid = *v + k1v/2.0;
-    duffing(t_mid, x_mid, v_mid, &dx2, &dv2);
-    k2x = dt * dx2;
-    k2v = dt * dv2;
+    t_half = *t + DT/2.0;
+    rhs(t_half, *x + k1x/2.0, *v + k1v/2.0, &dx, &dv);
+    k2x = DT * dx;
+    k2v = DT * dv;
     
-    // k3
-    x_mid = *x + k2x/2.0;
-    v_mid = *v + k2v/2.0;
-    duffing(t_mid, x_mid, v_mid, &dx3, &dv3);
-    k3x = dt * dx3;
-    k3v = dt * dv3;
+    rhs(t_half, *x + k2x/2.0, *v + k2v/2.0, &dx, &dv);
+    k3x = DT * dx;
+    k3v = DT * dv;
     
-    // k4
-    duffing(*t + dt, *x + k3x, *v + k3v, &dx4, &dv4);
-    k4x = dt * dx4;
-    k4v = dt * dv4;
+    rhs(*t + DT, *x + k3x, *v + k3v, &dx, &dv);
+    k4x = DT * dx;
+    k4v = DT * dv;
     
-    // Финальное обновление
     *x = *x + (k1x + 2.0*k2x + 2.0*k3x + k4x) / 6.0;
     *v = *v + (k1v + 2.0*k2v + 2.0*k3v + k4v) / 6.0;
-    *t = *t + dt;
+    *t = *t + DT;
 }
 
-// Энергия для консервативного случая (force_amp=0, delta=0)
-double energy(double x, double v) {
-    return 0.5 * v * v + 0.5 * alpha * x * x + 0.25 * beta * x * x * x * x;
+static double compute_energy(double x, double v) {
+    double kinetic = 0.5 * v * v;
+    double potential = 0.5 * params.alpha * x * x 
+                     + 0.25 * params.beta * x * x * x * x;
+    return kinetic + potential;
 }
 
-int main() {
-    FILE *fp;
-    double t[N], x[N], v[N], E[N], E0, E_rel_error;
+static int allocate_trajectory(int n) {
+    trajectory.t = (double*)malloc(n * sizeof(double));
+    trajectory.x = (double*)malloc(n * sizeof(double));
+    trajectory.v = (double*)malloc(n * sizeof(double));
+    trajectory.E = (double*)malloc(n * sizeof(double));
+    
+    if (!trajectory.t || !trajectory.x || !trajectory.v || !trajectory.E) {
+        fprintf(stderr, "Ошибка памяти\n");
+        return 0;
+    }
+    trajectory.n = n;
+    return 1;
+}
+
+static void free_trajectory(void) {
+    free(trajectory.t);
+    free(trajectory.x);
+    free(trajectory.v);
+    free(trajectory.E);
+    trajectory.n = 0;
+}
+
+static void integrate(void) {
     int i;
+    trajectory.t[0] = 0.0;
+    trajectory.x[0] = 1.0;
+    trajectory.v[0] = 0.0;
+    trajectory.E[0] = compute_energy(trajectory.x[0], trajectory.v[0]);
+    for (i = 0; i < trajectory.n - 1; i++) {
+        trajectory.t[i+1] = trajectory.t[i];
+        trajectory.x[i+1] = trajectory.x[i];
+        trajectory.v[i+1] = trajectory.v[i];
+        
+        rk4_step(&trajectory.t[i+1], &trajectory.x[i+1], &trajectory.v[i+1]);
+        trajectory.E[i+1] = compute_energy(trajectory.x[i+1], trajectory.v[i+1]);
+    }
+}
+static void save_results(const char *filename)
+{
+    FILE *fp = fopen(filename, "w");
+    int i;
+    double E0 = trajectory.E[0];
     
-    printf("Осциллятор Дуффинга - численное решение\n");
-    printf("Параметры:\n");
-    printf("  delta = %.2f\n", delta);
-    printf("  alpha = %.2f\n", alpha);
-    printf("  beta  = %.2f\n", beta);
-    printf("  force_amp = %.2f\n", force_amp);
-    printf("  force_freq = %.2f\n", force_freq);
-    printf("  dt    = %.4f\n", DT);
-    printf("  шагов = %d\n", N);
-    
-    t[0] = 0.0;
-    x[0] = 1.0;
-    v[0] = 0.0;
-    
-    // Расчёт энергии в начальный момент
-    E0 = energy(x[0], v[0]);
-    E[0] = E0;
-    
-    // Интегрирование методом Рунге-Кутты 4-го порядка
-    for (i = 0; i < N - 1; i++) {
-        t[i+1] = t[i];
-        x[i+1] = x[i];
-        v[i+1] = v[i];
-        rk4_step(&t[i+1], &x[i+1], &v[i+1], DT);
-        E[i+1] = energy(x[i+1], v[i+1]);
+    if (!fp) {
+        fprintf(stderr, "Файл не создан %s\n", filename);
+        return;
     }
     
-    fp = fopen("duffing_data.txt", "w");
-    if (fp == NULL) {
-        printf("Ошибка: не могу создать файл данных!\n");
+    fprintf(fp, "# t x v energy rel_error\n");
+    
+    for (i = 0; i < trajectory.n; i++) {
+        double rel_err = fabs((trajectory.E[i] - E0) / E0);
+        fprintf(fp, "%12.6f %12.6f %12.6f %12.6e %12.6e\n",
+                trajectory.t[i], trajectory.x[i], 
+                trajectory.v[i], trajectory.E[i], rel_err);
+    }
+    
+    fclose(fp);
+}
+static void print_stats(void) {
+    int i;
+    double max_err = 0.0;
+    double E0 = trajectory.E[0];
+    
+    for (i = 0; i < trajectory.n; i++) {
+        double err = fabs((trajectory.E[i] - E0) / E0);
+        if (err > max_err) max_err = err;
+    }
+    printf("  Максимальная ошибка энергии: %.2e\n", max_err);
+    printf("  (ожидается < 1e-11 для RK4)\n");
+    printf("\n");
+}
+
+static void print_params(void) {
+    printf("  Параметры:\n");
+    printf("    Затухание  %.3f\n", params.delta);
+    printf("    Линейная жсткость   %.3f\n", params.alpha);
+    printf("    Нелинейная жесткость %.3f\n", params.beta);
+    printf("    Амплитуда  %.3f\n", params.F);
+    printf("    Частота   %.3f\n", params.omega);
+    printf("  Численные параметры:\n");
+    printf("    dt = %.4f, шагов = %d\n", DT, N);
+}
+
+int main(void) {
+    print_params();
+    
+    if (!allocate_trajectory(N)) {
         return 1;
     }
     
-    fprintf(fp, "# t          x          v          Energy     RelError\n");
-    for (i = 0; i < N; i++) {
-        E_rel_error = fabs((E[i] - E0) / E0);
-        fprintf(fp, "%12.6f %12.6f %12.6f %12.6e %12.6e\n", 
-                t[i], x[i], v[i], E[i], E_rel_error);
-    }
-    fclose(fp);
-    
-    // Максимальная ошибка энергии
-    double max_error = 0.0;
-    for (i = 0; i < N; i++) {
-        E_rel_error = fabs((E[i] - E0) / E0);
-        if (E_rel_error > max_error) max_error = E_rel_error;
-    }
-    printf("\nМаксимальная относительная ошибка энергии: %.2e\n", max_error);
-    printf("(должна быть < 1e-11 для RK4)\n");
-    
-    printf("\nДанные сохранены в 'duffing_data.txt'\n");
-    printf("Запустите Gnuplot командой: gnuplot duffing_plot.gp\n");
+    integrate();
+    save_results("duffing_data.txt");
+    print_stats();
+    free_trajectory();
     
     return 0;
-} 
+}
