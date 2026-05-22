@@ -57,8 +57,7 @@ static void rk4_step(double *t, double *x, double *v) {
 
 static double compute_energy(double x, double v) {
     double kinetic = 0.5 * v * v;
-    double potential = 0.5 * params.a * x * x 
-                     + 0.25 * params.b * x * x * x * x;
+    double potential = 0.5 * params.a * x * x + 0.25 * params.b * x * x * x * x;
     return kinetic + potential;
 }
 
