@@ -6,11 +6,11 @@
 #define DT 0.01
 
 static struct {
-    double delta;
-    double alpha;
-    double beta;
-    double F;
-    double omega;
+    double d;
+    double a;
+    double b;
+    double f;
+    double w;
 } params = {0.0, 1.0, 0.5, 0.0, 1.0}; 
 
 static struct {
@@ -22,11 +22,11 @@ static struct {
 } trajectory = {NULL, NULL, NULL, NULL, 0};
 
 static void rhs(double t, double x, double v, double *dx, double *dv) {
-    double force = params.F * cos(params.omega * t);
-    double nonlinear = params.alpha * x + params.beta * x * x * x;
+    double force = params.f * cos(params.w * t);
+    double nonlinear = params.a * x + params.b * x * x * x;
     
     *dx = v;
-    *dv = -params.delta * v - nonlinear + force;
+    *dv = -params.d * v - nonlinear + force;
 }
 
 static void rk4_step(double *t, double *x, double *v) {
@@ -57,8 +57,8 @@ static void rk4_step(double *t, double *x, double *v) {
 
 static double compute_energy(double x, double v) {
     double kinetic = 0.5 * v * v;
-    double potential = 0.5 * params.alpha * x * x 
-                     + 0.25 * params.beta * x * x * x * x;
+    double potential = 0.5 * params.a * x * x 
+                     + 0.25 * params.b * x * x * x * x;
     return kinetic + potential;
 }
 
@@ -99,6 +99,7 @@ static void integrate(void) {
         trajectory.E[i+1] = compute_energy(trajectory.x[i+1], trajectory.v[i+1]);
     }
 }
+
 static void save_results(const char *filename)
 {
     FILE *fp = fopen(filename, "w");
@@ -121,6 +122,7 @@ static void save_results(const char *filename)
     
     fclose(fp);
 }
+
 static void print_stats(void) {
     int i;
     double max_err = 0.0;
@@ -137,11 +139,11 @@ static void print_stats(void) {
 
 static void print_params(void) {
     printf("Параметры:\n");
-    printf("Затухание  %.3f\n", params.delta);
-    printf("Линейная жсткость   %.3f\n", params.alpha);
-    printf("Нелинейная жесткость %.3f\n", params.beta);
-    printf("Аплитуда  %.3f\n", params.F);
-    printf("Частота   %.3f\n", params.omega);
+    printf("Затухание  %.3f\n", params.d);
+    printf("Линейная жсткость   %.3f\n", params.a);
+    printf("Нелинейная жесткость %.3f\n", params.b);
+    printf("Аплитуда  %.3f\n", params.f);
+    printf("Частота   %.3f\n", params.w);
     printf("Численные параметры:\n");
     printf("dt = %.4f, шагов = %d\n", DT, N);
 }
