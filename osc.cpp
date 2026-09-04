@@ -29,17 +29,6 @@ double analytical_v(double t) {
     return -X0 * OMEGA * sin(OMEGA * t) + V0 * cos(OMEGA * t);
 }
 
-State euler_explicit(const State& s, double dt) {
-    double a = -OMEGA * OMEGA * s.x;
-    return State(s.x + s.v * dt, s.v + a * dt);
-}
-
-State euler_implicit(const State& s, double dt) {
-    double x_new = (s.x + s.v * dt) / (1.0 + (OMEGA * dt) * (OMEGA * dt));
-    double v_new = s.v - OMEGA * OMEGA * x_new * dt;
-    return State(x_new, v_new);
-}
-
 State verlet(const State& s, double dt) {
     double v_half = s.v - 0.5 * OMEGA * OMEGA * s.x * dt;
     double x_new = s.x + v_half * dt;
@@ -47,20 +36,19 @@ State verlet(const State& s, double dt) {
     return State(x_new, v_new);
 }
 
-std::vector<State> solve_ode(State (*method)(const State&, double)) {
+std::vector<State> solve_ode() {
     std::vector<State> trajectory;
     State current(X0, V0);
     trajectory.push_back(current);
     
     for (int i = 0; i < N_STEPS; ++i) {
-        current = method(current, DT);
+        current = verlet(current, DT);
         trajectory.push_back(current);
     }
     return trajectory;
 }
 
-std::vector<State> traj_euler, traj_implicit, traj_verlet;
-std::vector<Point2D> analytic_traj;
+std::vector<State> traj_verlet;
 int current_frame = 0;
 bool is_animating = true;
 
@@ -93,6 +81,7 @@ void draw_phase_portrait() {
     glVertex2f(-2.0, 0); glVertex2f(2.0, 0);
     glVertex2f(0, -2.0); glVertex2f(0, 2.0);
     glEnd();
+    
     glColor3f(0.7, 0.7, 0.7);
     glBegin(GL_LINE_STRIP);
     for (int i = 0; i < 100; ++i) {
@@ -102,31 +91,24 @@ void draw_phase_portrait() {
         glVertex2f(x, v);
     }
     glEnd();
+    glColor3f(0.2, 1.0, 0.2);
+    glBegin(GL_LINE_STRIP);
+    for (int i = 0; i <= current_frame && i < (int)traj_verlet.size(); ++i) {
+        glVertex2f(traj_verlet[i].x, traj_verlet[i].v);
+    }
+    glEnd();
     
-    auto draw_trajectory = [&](const std::vector<State>& traj, float r, float g, float b, int max_idx) {
-        glColor3f(r, g, b);
-        glBegin(GL_LINE_STRIP);
-        for (int i = 0; i <= max_idx && i < (int)traj.size(); ++i) {
-            glVertex2f(traj[i].x, traj[i].v);
-        }
+    if (current_frame < (int)traj_verlet.size()) {
+        glPointSize(8.0);
+        glColor3f(0.2, 1.0, 0.2);
+        glBegin(GL_POINTS);
+        glVertex2f(traj_verlet[current_frame].x, traj_verlet[current_frame].v);
         glEnd();
-        
-        if (max_idx < (int)traj.size()) {
-            glPointSize(8.0);
-            glBegin(GL_POINTS);
-            glVertex2f(traj[max_idx].x, traj[max_idx].v);
-            glEnd();
-        }
-    };
+    }
     
-    int idx = std::min(current_frame, N_STEPS);
-    draw_trajectory(traj_euler, 1.0, 0.2, 0.2, idx);
-    draw_trajectory(traj_implicit, 0.2, 0.2, 1.0, idx);
-    draw_trajectory(traj_verlet, 0.2, 1.0, 0.2, idx);
     draw_text(-1.9, 1.8, "Phase Portrait");
-    glColor3f(1.0, 0.2, 0.2); draw_text(-1.9, 1.6, "Euler (explicit)");
-    glColor3f(0.2, 0.2, 1.0); draw_text(-1.9, 1.45, "Euler (implicit)");
-    glColor3f(0.2, 1.0, 0.2); draw_text(-1.9, 1.3, "Verlet");
+    draw_text(-1.9, 1.6, "Green - Verlet");
+    draw_text(-1.9, 1.45, "Gray - Analytical");
 }
 
 void draw_position_vs_time() {
@@ -145,7 +127,6 @@ void draw_position_vs_time() {
         glVertex2f(0, x); glVertex2f(N_STEPS * DT, x);
     }
     glEnd();
-    
     glColor3f(0.7, 0.7, 0.7);
     glBegin(GL_LINE_STRIP);
     for (int i = 0; i <= current_frame && i <= N_STEPS; ++i) {
@@ -153,19 +134,12 @@ void draw_position_vs_time() {
         glVertex2f(t, analytical_x(t));
     }
     glEnd();
-    
-    auto draw_time_series = [&](const std::vector<State>& traj, float r, float g, float b) {
-        glColor3f(r, g, b);
-        glBegin(GL_LINE_STRIP);
-        for (int i = 0; i <= current_frame && i < (int)traj.size(); ++i) {
-            glVertex2f(i * DT, traj[i].x);
-        }
-        glEnd();
-    };
-    
-    draw_time_series(traj_euler, 1.0, 0.2, 0.2);
-    draw_time_series(traj_implicit, 0.2, 0.2, 1.0);
-    draw_time_series(traj_verlet, 0.2, 1.0, 0.2);
+    glColor3f(0.2, 1.0, 0.2);
+    glBegin(GL_LINE_STRIP);
+    for (int i = 0; i <= current_frame && i < (int)traj_verlet.size(); ++i) {
+        glVertex2f(i * DT, traj_verlet[i].x);
+    }
+    glEnd();
     draw_text(0.5, 1.8, "Position x(t)");
     glColor3f(1.0, 1.0, 1.0);
     char time_str[50];
@@ -189,25 +163,20 @@ void draw_energy() {
         glVertex2f(0, E); glVertex2f(N_STEPS * DT, E);
     }
     glEnd();
+    
     double E_exact = 0.5 * (V0*V0 + OMEGA*OMEGA * X0*X0);
     glColor3f(0.7, 0.7, 0.7);
     glBegin(GL_LINES);
     glVertex2f(0, E_exact); glVertex2f(N_STEPS * DT, E_exact);
     glEnd();
-    auto draw_energy_series = [&](const std::vector<State>& traj, float r, float g, float b) {
-        glColor3f(r, g, b);
-        glBegin(GL_LINE_STRIP);
-        for (int i = 0; i <= current_frame && i < (int)traj.size(); ++i) {
-            double E = 0.5 * (traj[i].v * traj[i].v + OMEGA*OMEGA * traj[i].x * traj[i].x);
-            glVertex2f(i * DT, E);
-        }
-        glEnd();
-    };
     
-    draw_energy_series(traj_euler, 1.0, 0.2, 0.2);
-    draw_energy_series(traj_implicit, 0.2, 0.2, 1.0);
-    draw_energy_series(traj_verlet, 0.2, 1.0, 0.2);
-    
+    glColor3f(0.2, 1.0, 0.2);
+    glBegin(GL_LINE_STRIP);
+    for (int i = 0; i <= current_frame && i < (int)traj_verlet.size(); ++i) {
+        double E = 0.5 * (traj_verlet[i].v * traj_verlet[i].v + OMEGA*OMEGA * traj_verlet[i].x * traj_verlet[i].x);
+        glVertex2f(i * DT, E);
+    }
+    glEnd();
     draw_text(0.5, 1.05, "Energy E(t)");
 }
 
@@ -227,18 +196,14 @@ void draw_error() {
         glVertex2f(0, e); glVertex2f(N_STEPS * DT, e);
     }
     glEnd();
-    auto draw_error_series = [&](const std::vector<State>& traj, float r, float g, float b) {
-        glColor3f(r, g, b);
-        glBegin(GL_LINE_STRIP);
-        for (int i = 0; i <= current_frame && i < (int)traj.size(); ++i) {
-            double err = traj[i].x - analytical_x(i * DT);
-            glVertex2f(i * DT, err);
-        }
-        glEnd();
-    };
-    draw_error_series(traj_euler, 1.0, 0.2, 0.2);
-    draw_error_series(traj_implicit, 0.2, 0.2, 1.0);
-    draw_error_series(traj_verlet, 0.2, 1.0, 0.2);
+    glColor3f(0.2, 1.0, 0.2);
+    glBegin(GL_LINE_STRIP);
+    for (int i = 0; i <= current_frame && i < (int)traj_verlet.size(); ++i) {
+        double err = traj_verlet[i].x - analytical_x(i * DT);
+        glVertex2f(i * DT, err);
+    }
+    glEnd();
+    
     draw_text(0.5, 0.9, "Error x(t) - analytical");
 }
 
@@ -279,9 +244,7 @@ void keyboard(unsigned char key, int x, int y) {
 
 void init() {
     glClearColor(0.1, 0.1, 0.1, 1.0);
-    traj_euler = solve_ode(euler_explicit);
-    traj_implicit = solve_ode(euler_implicit);
-    traj_verlet = solve_ode(verlet);
+    traj_verlet = solve_ode();
     printf("Данные гармонического осцилятора\n");
     printf("Угловая чистота = %.2f, Период = %.2f, Шаг = %.2f\n", OMEGA, T, DT);
     printf("Всего шагов: %d\n", N_STEPS);
