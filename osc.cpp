@@ -16,11 +16,6 @@ struct State {
     State(double x = 0, double v = 0) : x(x), v(v) {}
 };
 
-struct Point2D {
-    double x, y;
-    Point2D(double x = 0, double y = 0) : x(x), y(y) {}
-};
-
 double analytical_x(double t) {
     return X0 * cos(OMEGA * t) + (V0 / OMEGA) * sin(OMEGA * t);
 }
