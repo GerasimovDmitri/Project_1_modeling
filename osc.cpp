@@ -1,6 +1,3 @@
-#include <GL/glut.h>
-#include <GL/gl.h>
-#include <GL/glu.h>
 #include <cmath>
 #include <vector>
 #include <cstdio>
@@ -16,254 +13,60 @@ struct State {
     State(double x = 0, double v = 0) : x(x), v(v) {}
 };
 
-double analytical_x(double t) {
-    return X0 * cos(OMEGA * t) + (V0 / OMEGA) * sin(OMEGA * t);
+State f(const State& s) {
+    return State(s.v, -OMEGA * OMEGA * s.x);
 }
 
-double analytical_v(double t) {
-    return -X0 * OMEGA * sin(OMEGA * t) + V0 * cos(OMEGA * t);
-}
+State rk4_step(const State& s, double dt) {
+    State k1 = f(s);
+    State k2 = f(State(s.x + 0.5 * dt * k1.x, s.v + 0.5 * dt * k1.v));
+    State k3 = f(State(s.x + 0.5 * dt * k2.x, s.v + 0.5 * dt * k2.v));
+    State k4 = f(State(s.x + dt * k3.x,       s.v + dt * k3.v));
 
-State verlet(const State& s, double dt) {
-    double v_half = s.v - 0.5 * OMEGA * OMEGA * s.x * dt;
-    double x_new = s.x + v_half * dt;
-    double v_new = v_half - 0.5 * OMEGA * OMEGA * x_new * dt;
-    return State(x_new, v_new);
+    State next;
+    next.x = s.x + (dt / 6.0) * (k1.x + 2.0 * k2.x + 2.0 * k3.x + k4.x);
+    next.v = s.v + (dt / 6.0) * (k1.v + 2.0 * k2.v + 2.0 * k3.v + k4.v);
+    return next;
 }
 
 std::vector<State> solve_ode() {
     std::vector<State> trajectory;
     State current(X0, V0);
     trajectory.push_back(current);
-    
+
     for (int i = 0; i < N_STEPS; ++i) {
-        current = verlet(current, DT);
+        current = rk4_step(current, DT);
         trajectory.push_back(current);
     }
     return trajectory;
 }
 
-std::vector<State> traj_verlet;
-int current_frame = 0;
-bool is_animating = true;
+void dump_data(const std::vector<State>& traj) {
+    FILE* fp = fopen("oscdata", "w");
+    if (!fp) {
+        printf("Не удалось открыть файл oscdata для записи\n");
+    }
 
-void draw_text(float x, float y, const char* text) {
-    glColor3f(1.0, 1.0, 1.0);
-    glRasterPos2f(x, y);
-    for (const char* c = text; *c != '\0'; ++c) {
-        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
-    }
-}
-
-void draw_phase_portrait() {
-    glViewport(0, 0, 400, 400);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluOrtho2D(-2.0, 2.0, -2.0, 2.0);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    
-    glColor3f(0.2, 0.2, 0.2);
-    glBegin(GL_LINES);
-    for (double x = -1.5; x <= 1.5; x += 0.5) {
-        glVertex2f(x, -1.5); glVertex2f(x, 1.5);
-        glVertex2f(-1.5, x); glVertex2f(1.5, x);
-    }
-    glEnd();
-    
-    glColor3f(0.5, 0.5, 0.5);
-    glBegin(GL_LINES);
-    glVertex2f(-2.0, 0); glVertex2f(2.0, 0);
-    glVertex2f(0, -2.0); glVertex2f(0, 2.0);
-    glEnd();
-    
-    glColor3f(0.7, 0.7, 0.7);
-    glBegin(GL_LINE_STRIP);
-    for (int i = 0; i < 100; ++i) {
-        double angle = 2.0 * M_PI * i / 100.0;
-        double x = X0 * cos(angle);
-        double v = -X0 * OMEGA * sin(angle);
-        glVertex2f(x, v);
-    }
-    glEnd();
-    glColor3f(0.2, 1.0, 0.2);
-    glBegin(GL_LINE_STRIP);
-    for (int i = 0; i <= current_frame && i < (int)traj_verlet.size(); ++i) {
-        glVertex2f(traj_verlet[i].x, traj_verlet[i].v);
-    }
-    glEnd();
-    
-    if (current_frame < (int)traj_verlet.size()) {
-        glPointSize(8.0);
-        glColor3f(0.2, 1.0, 0.2);
-        glBegin(GL_POINTS);
-        glVertex2f(traj_verlet[current_frame].x, traj_verlet[current_frame].v);
-        glEnd();
-    }
-    
-    draw_text(-1.9, 1.8, "Phase Portrait");
-    draw_text(-1.9, 1.6, "Green - Verlet");
-    draw_text(-1.9, 1.45, "Gray - Analytical");
-}
-
-void draw_position_vs_time() {
-    glViewport(400, 0, 400, 400);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluOrtho2D(0, N_STEPS * DT, -2.0, 2.0);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    glColor3f(0.2, 0.2, 0.2);
-    glBegin(GL_LINES);
-    for (double t = 0; t <= N_STEPS * DT; t += T/4) {
-        glVertex2f(t, -1.5); glVertex2f(t, 1.5);
-    }
-    for (double x = -1.5; x <= 1.5; x += 0.5) {
-        glVertex2f(0, x); glVertex2f(N_STEPS * DT, x);
-    }
-    glEnd();
-    glColor3f(0.7, 0.7, 0.7);
-    glBegin(GL_LINE_STRIP);
-    for (int i = 0; i <= current_frame && i <= N_STEPS; ++i) {
+    for (size_t i = 0; i < traj.size(); ++i) {
         double t = i * DT;
-        glVertex2f(t, analytical_x(t));
-    }
-    glEnd();
-    glColor3f(0.2, 1.0, 0.2);
-    glBegin(GL_LINE_STRIP);
-    for (int i = 0; i <= current_frame && i < (int)traj_verlet.size(); ++i) {
-        glVertex2f(i * DT, traj_verlet[i].x);
-    }
-    glEnd();
-    draw_text(0.5, 1.8, "Position x(t)");
-    glColor3f(1.0, 1.0, 1.0);
-    char time_str[50];
-    sprintf(time_str, "t = %.2f", current_frame * DT);
-    draw_text(0.5, 1.6, time_str);
-}
 
-void draw_energy() {
-    glViewport(0, 400, 400, 400);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluOrtho2D(0, N_STEPS * DT, 0.0, 1.2);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    glColor3f(0.2, 0.2, 0.2);
-    glBegin(GL_LINES);
-    for (double t = 0; t <= N_STEPS * DT; t += T/4) {
-        glVertex2f(t, 0.0); glVertex2f(t, 1.2);
-    }
-    for (double E = 0.2; E <= 1.0; E += 0.2) {
-        glVertex2f(0, E); glVertex2f(N_STEPS * DT, E);
-    }
-    glEnd();
-    
-    double E_exact = 0.5 * (V0*V0 + OMEGA*OMEGA * X0*X0);
-    glColor3f(0.7, 0.7, 0.7);
-    glBegin(GL_LINES);
-    glVertex2f(0, E_exact); glVertex2f(N_STEPS * DT, E_exact);
-    glEnd();
-    
-    glColor3f(0.2, 1.0, 0.2);
-    glBegin(GL_LINE_STRIP);
-    for (int i = 0; i <= current_frame && i < (int)traj_verlet.size(); ++i) {
-        double E = 0.5 * (traj_verlet[i].v * traj_verlet[i].v + OMEGA*OMEGA * traj_verlet[i].x * traj_verlet[i].x);
-        glVertex2f(i * DT, E);
-    }
-    glEnd();
-    draw_text(0.5, 1.05, "Energy E(t)");
-}
+        printf("%lf   %le %le\n", t, traj[i].x, traj[i].v);
 
-void draw_error() {
-    glViewport(400, 400, 400, 400);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluOrtho2D(0, N_STEPS * DT, -1.0, 1.0);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    glColor3f(0.2, 0.2, 0.2);
-    glBegin(GL_LINES);
-    for (double t = 0; t <= N_STEPS * DT; t += T/4) {
-        glVertex2f(t, -0.8); glVertex2f(t, 0.8);
-    }
-    for (double e = -0.8; e <= 0.8; e += 0.4) {
-        glVertex2f(0, e); glVertex2f(N_STEPS * DT, e);
-    }
-    glEnd();
-    glColor3f(0.2, 1.0, 0.2);
-    glBegin(GL_LINE_STRIP);
-    for (int i = 0; i <= current_frame && i < (int)traj_verlet.size(); ++i) {
-        double err = traj_verlet[i].x - analytical_x(i * DT);
-        glVertex2f(i * DT, err);
-    }
-    glEnd();
-    
-    draw_text(0.5, 0.9, "Error x(t) - analytical");
-}
-
-void display() {
-    glClear(GL_COLOR_BUFFER_BIT);
-    draw_phase_portrait();
-    draw_position_vs_time();
-    draw_energy();
-    draw_error();
-    glutSwapBuffers();
-}
-
-void timer(int value) {
-    if (is_animating) {
-        current_frame++;
-        if (current_frame > N_STEPS) {
-            current_frame = 0;
+        if (fp) {
+            fprintf(fp, "%lf   %le %le\n", t, traj[i].x, traj[i].v);
         }
-        glutPostRedisplay();
     }
-    glutTimerFunc(50, timer, 0);
+
+    if (fp) fclose(fp);
 }
 
-void keyboard(unsigned char key, int x, int y) {
-    switch(key) {
-        case ' ':
-            is_animating = !is_animating;
-            break;
-        case 'r':
-            current_frame = 0;
-            glutPostRedisplay();
-            break;
-        case 27:
-            exit(0);
-            break;
-    }
-}
-
-void init() {
-    glClearColor(0.1, 0.1, 0.1, 1.0);
-    traj_verlet = solve_ode();
-    printf("Данные гармонического осцилятора\n");
-    printf("Угловая чистота = %.2f, Период = %.2f, Шаг = %.2f\n", OMEGA, T, DT);
+int main() {
+    printf("Данные гармонического осциллятора\n");
+    printf("Угловая частота = %.2f, Период = %.2f, Шаг = %.2f\n", OMEGA, T, DT);
     printf("Всего шагов: %d\n", N_STEPS);
-}
 
-void reshape(int w, int h) {
-    glViewport(0, 0, w, h);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluOrtho2D(0, w, 0, h);
-    glMatrixMode(GL_MODELVIEW);
-}
+    std::vector<State> traj_rk4 = solve_ode();
+    dump_data(traj_rk4);
 
-int main(int argc, char** argv) {
-    glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
-    glutInitWindowSize(800, 800);
-    glutInitWindowPosition(100, 100);
-    glutCreateWindow("Sus");
-    init();
-    glutDisplayFunc(display);
-    glutReshapeFunc(reshape);
-    glutKeyboardFunc(keyboard);
-    glutTimerFunc(0, timer, 0);
-    glutMainLoop();
     return 0;
 }
