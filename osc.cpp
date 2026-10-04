@@ -2,10 +2,12 @@
 #include <vector>
 #include <cstdio>
 
-const double OMEGA = 1.0;
-const double T = 2.0 * M_PI / OMEGA;
-const double DT = T / 30.0;
-const int N_STEPS = 300;
+const double MASS   = 1.0;
+const double K      = 1.0;
+const double OMEGA  = std::sqrt(K / MASS);
+const double T      = 2.0 * M_PI / OMEGA;
+const double DT     = T / 30.0;
+const int    N_STEPS = 300;
 const double X0 = 1.0, V0 = 0.0;
 
 struct State {
@@ -14,7 +16,7 @@ struct State {
 };
 
 State f(const State& s) {
-    return State(s.v, -OMEGA * OMEGA * s.x);
+    return State(s.v, -(K / MASS) * s.x);
 }
 
 State rk4_step(const State& s, double dt) {
@@ -62,8 +64,9 @@ void dump_data(const std::vector<State>& traj) {
 
 int main() {
     printf("Данные гармонического осциллятора\n");
-    printf("Угловая частота = %.2f, Период = %.2f, Шаг = %.2f\n", OMEGA, T, DT);
-    printf("Всего шагов: %d\n", N_STEPS);
+    printf("m = %.3f, k = %.3f, omega = %.3f, T = %.3f, dt = %.3f\n",
+           MASS, K, OMEGA, T, DT);
+    printf("x0 = %.3f, v0 = %.3f, шагов: %d\n", X0, V0, N_STEPS);
 
     std::vector<State> traj_rk4 = solve_ode();
     dump_data(traj_rk4);
