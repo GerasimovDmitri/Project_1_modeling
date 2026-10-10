@@ -106,9 +106,6 @@ int main(int argc, char** argv) {
 
     State s0(x0, y0, z0);
     LyapResult res = benettin(s0, d0, N_STEPS);
-
-    dump_lyap(res);
-    dump_traj(res.trajectory);
-
+    
     return 0;
 }
