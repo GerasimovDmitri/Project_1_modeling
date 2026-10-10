@@ -22,27 +22,15 @@ State f(const State& s) {
 
 State rk4_step(const State& s, double dt) {
     State k1 = f(s);
-    State k2 = f(State(s.x + 0.5 * dt * k1.x, s.v + 0.5 * dt * k1.v));
-    State k3 = f(State(s.x + 0.5 * dt * k2.x, s.v + 0.5 * dt * k2.v));
-    State k4 = f(State(s.x + dt * k3.x,       s.v + dt * k3.v));
+    State k2 = f(State(s.x + 0.5 * dt * k1.x, s.y + 0.5 * dt * k1.y, s.z + 0.5 * dt * k1.z));
+    State k3 = f(State(s.x + 0.5 * dt * k2.x, s.y + 0.5 * dt * k2.y, s.z + 0.5 * dt * k2.z));
+    State k4 = f(State(s.x + dt * k3.x, s.y + dt * k3.y, s.z + dt * k3.z));
 
     State next;
     next.x = s.x + (dt / 6.0) * (k1.x + 2.0 * k2.x + 2.0 * k3.x + k4.x);
     next.y = s.y + (dt / 6.0) * (k1.y + 2.0 * k2.y + 2.0 * k3.y + k4.y);
     next.z = s.z + (dt / 6.0) * (k1.z + 2.0 * k2.z + 2.0 * k3.z + k4.z);
     return next;
-}
-
-std::vector<State> solve_ode() {
-    std::vector<State> trajectory;
-    State current(X0, V0);
-    trajectory.push_back(current);
-
-    for (int i = 0; i < N_STEPS; ++i) {
-        current = rk4_step(current, DT);
-        trajectory.push_back(current);
-    }
-    return trajectory;
 }
 
 double norm(const State& s) {
