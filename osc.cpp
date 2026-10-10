@@ -100,6 +100,6 @@ int main(int argc, char** argv) {
     double d0 = (argc >= 5) ? std::atof(argv[4]) : D0;
     State s0(x0, y0, z0);
     LyapResult res = benettin(s0, d0, N_STEPS);
-    std::printf("%.6f\n", res);
+    std::printf("%.6f\n", res.lambda);
     return 0;
 }
