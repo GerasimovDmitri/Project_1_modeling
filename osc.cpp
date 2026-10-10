@@ -98,14 +98,8 @@ int main(int argc, char** argv) {
         z0 = std::atof(argv[3]);
     }
     double d0 = (argc >= 5) ? std::atof(argv[4]) : D0;
-
-    std::printf("Вычисление показателя Ляпунова методом Бенеттина\n");
-    std::printf("sigma = %.3f, rho = %.3f, beta = %.3f\n", SIGMA, RHO, BETA);
-    std::printf("x0 = %.3f, y0 = %.3f, z0 = %.3f\n", x0, y0, z0);
-    std::printf("dt = %.4lf, шагов = %d, d0 = %.1le\n\n", DT, N_STEPS, d0);
-
     State s0(x0, y0, z0);
     LyapResult res = benettin(s0, d0, N_STEPS);
-    
+    std::printf("%.6f\n", res);
     return 0;
 }
