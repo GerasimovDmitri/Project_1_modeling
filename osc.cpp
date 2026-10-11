@@ -1,6 +1,4 @@
 #include <cmath>
-#include <vector>
-#include <cstdlib>
 #include <cstdio>
 
 const double SIGMA = 10.0;
@@ -37,14 +35,7 @@ double norm(const State& s) {
     return std::sqrt(s.x * s.x + s.y * s.y + s.z * s.z);
 }
 
-struct LyapResult {
-    double lambda;
-    std::vector<double> t;
-    std::vector<double> lambda_t;
-    std::vector<State> trajectory;
-};
-
-LyapResult benettin(const State& s0, double d0, int n_steps) {
+double benettin(const State& s0, double d0, int n_steps) {
     State s = s0;
     State delta(1.0, 0.0, 0.0);
     double nd = norm(delta);
@@ -55,11 +46,6 @@ LyapResult benettin(const State& s0, double d0, int n_steps) {
              s.z + d0 * delta.z);
 
     double sum = 0.0;
-    LyapResult res;
-    res.t.reserve(n_steps);
-    res.lambda_t.reserve(n_steps);
-    res.trajectory.reserve(n_steps + 1);
-    res.trajectory.push_back(s);
 
     for (int i = 1; i <= n_steps; ++i) {
         s  = rk4_step(s,  DT);
@@ -80,26 +66,14 @@ LyapResult benettin(const State& s0, double d0, int n_steps) {
         sp.x = s.x + (dx / d) * d0;
         sp.y = s.y + (dy / d) * d0;
         sp.z = s.z + (dz / d) * d0;
-        double time = i * DT;
-        res.t.push_back(time);
-        res.lambda_t.push_back(sum / time);
-        res.trajectory.push_back(s);
     }
 
-    res.lambda = sum / (n_steps * DT);
-    return res;
+    return sum / (n_steps * DT);
 }
 
-int main(int argc, char** argv) {
-    double x0 = X0, y0 = Y0, z0 = Z0;
-    if (argc >= 4) {
-        x0 = std::atof(argv[1]);
-        y0 = std::atof(argv[2]);
-        z0 = std::atof(argv[3]);
-    }
-    double d0 = (argc >= 5) ? std::atof(argv[4]) : D0;
-    State s0(x0, y0, z0);
-    LyapResult res = benettin(s0, d0, N_STEPS);
-    std::printf("%.6f\n", res.lambda);
+int main() {
+    State s0(X0, Y0, Z0);
+    double lambda = benettin(s0, D0, N_STEPS);
+    std::printf("%.6f\n", lambda);
     return 0;
 }
